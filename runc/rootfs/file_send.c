@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 			//if((event->mask & IN_DELETE) && !strcmp(event->name, "message"))
 			if(!strcmp(signal,"exit"))
 				goto end;
-			
+			printf("test: %s\n",signal);
 			p += sizeof(struct inotify_event) + event->len;
 		}
 	}
