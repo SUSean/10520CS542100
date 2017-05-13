@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 	char *p;
 	struct inotify_event *event;
 
-	inotifyFd = inotify_init();                 
+	inotifyFd = inotify_init();
 	if (inotifyFd == -1) {
 		perror(strerror(errno));
 		printf("inotifyFd\n");
@@ -30,20 +30,21 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	FILE *fp = fopen("message", "w");
-        char ch;
-        char signal[4];
-        int i = 0;
-        printf("Send : ");
-        while((ch = getchar()) != '\n'){
-                fputc(ch, fp);
-                putchar(ch);
-                if(i<4)
-                        signal[i]=ch;
-                i++;
-        }
-       	fputc('\n', fp);
-        putchar('\n');
-        fclose(fp);
+	char ch;
+	char signal[4];
+	int i = 0;
+	printf("Send : ");
+	while((ch = getchar()) != '\n'){
+			fputc(ch, fp);
+			putchar(ch);
+			if(i<4)
+					signal[i]=ch;
+			i++;
+	}
+	fputc('\n', fp);
+	putchar('\n');
+	fclose(fp);
+
 	while(1) {
 		numRead = read(inotifyFd, buf, BUF_LEN);
 		if (numRead <= 0) {
@@ -55,7 +56,6 @@ int main(int argc, char *argv[])
 		for (p = buf; p < buf + numRead; ) {
 			event = (struct inotify_event *) p;
 
-			//if((event->mask & IN_DELETE) && !strcmp(event->name, "message"))
 			if(!strcmp(signal,"exit") && i == 4)
 				goto end;
 			if((event->mask & IN_CLOSE_WRITE) && !strcmp(event->name, "return")){
@@ -70,16 +70,16 @@ int main(int argc, char *argv[])
 				fp = fopen("message", "w");
 				i = 0;
 				printf("Send : ");
-        			while((ch = getchar()) != '\n'){
-                			fputc(ch, fp);
-                			putchar(ch);
-                			if(i<4)
-                        			signal[i]=ch;
-                			i++;
-        			}
-        			fputc('\n', fp);
-        			putchar('\n');
-        			fclose(fp);
+				while((ch = getchar()) != '\n'){
+					fputc(ch, fp);
+					putchar(ch);
+					if(i<4)
+						signal[i]=ch;
+					i++;
+				}
+				fputc('\n', fp);
+				putchar('\n');
+				fclose(fp);
 			}
 
 			p += sizeof(struct inotify_event) + event->len;

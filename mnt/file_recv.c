@@ -30,6 +30,12 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	FILE *fp;
+	char ch;
+	char input[1024];
+	char signal[4];
+	int i, j;
+
 	while(1) {     
 		numRead = read(inotifyFd, buf, BUF_LEN);
 		if (numRead <= 0) {
@@ -41,12 +47,9 @@ int main(int argc, char *argv[])
 			event = (struct inotify_event *) p;
 
 			if((event->mask & IN_CLOSE_WRITE) && !strcmp(event->name, "message")){
-				FILE *fp = fopen("message", "r");
-				char ch;
-				char input[1024];
-				char signal[4];
-				int i = 0,j;
-				printf("Recv:");
+				fp = fopen("message", "r");
+				i = 0;
+				printf("Recv : ");
 				while((ch = fgetc(fp)) != '\n'){
 					putchar(ch);
 					input[i]=ch;
@@ -56,19 +59,18 @@ int main(int argc, char *argv[])
 				}
 				printf("\n");
 				fclose(fp);
-				//system("rm -f message");
+				system("rm -f message");
 				if(!strcmp(signal,"exit") && i == 4)
 					goto end;
 				fp = fopen("return", "w");
 				printf("Send : ");
-        			for(j = 0; j < i; j++){
-                			fputc(input[j], fp);
+				for(j = 0; j < i; j++){
+					fputc(input[j], fp);
 					putchar(input[j]);
 				}
-        			fputc('\n', fp);
+				fputc('\n', fp);
 				putchar('\n');
-        			fclose(fp);
-				system("rm -f message");
+				fclose(fp);
 			}
 
 			p += sizeof(struct inotify_event) + event->len;
