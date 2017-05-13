@@ -29,24 +29,22 @@ int main(int argc, char *argv[])
 		printf("inotify_add_watch\n");
 		return 1;
 	}
-
+	FILE *fp = fopen("message", "w");
+        char ch;
+        char signal[4];
+        int i = 0;
+        printf("Send : ");
+        while((ch = getchar()) != '\n'){
+                fputc(ch, fp);
+                putchar(ch);
+                if(i<4)
+                        signal[i]=ch;
+                i++;
+        }
+       	fputc('\n', fp);
+        putchar('\n');
+        fclose(fp);
 	while(1) {
-		FILE *fp = fopen("message", "w");
-        	char ch;
-		char signal[4];
-		int i = 0;
-		printf("Send : ");
-        	while((ch = getchar()) != '\n'){
-                	fputc(ch, fp);
-			putchar(ch);
-			if(i<4)
-        			signal[i]=ch;
-			i++;
-		}
-        	fputc('\n', fp);
-		putchar('\n');
-        	fclose(fp);                                 
-		
 		numRead = read(inotifyFd, buf, BUF_LEN);
 		if (numRead <= 0) {
 			perror(strerror(errno));
@@ -68,6 +66,20 @@ int main(int argc, char *argv[])
 				printf("\n");
 				fclose(fp);
 				system("rm -f return");
+				
+				fp = fopen("message", "w");
+				i = 0;
+				printf("Send : ");
+        			while((ch = getchar()) != '\n'){
+                			fputc(ch, fp);
+                			putchar(ch);
+                			if(i<4)
+                        			signal[i]=ch;
+                			i++;
+        			}
+        			fputc('\n', fp);
+        			putchar('\n');
+        			fclose(fp);
 			}
 
 			p += sizeof(struct inotify_event) + event->len;

@@ -56,8 +56,8 @@ int main(int argc, char *argv[])
 				}
 				printf("\n");
 				fclose(fp);
-				system("rm -f message");
-				if(!strcmp(signal,"exit") && i <= 4)
+				//system("rm -f message");
+				if(!strcmp(signal,"exit") && i == 4)
 					goto end;
 				fp = fopen("return", "w");
 				printf("Send : ");
@@ -67,7 +67,8 @@ int main(int argc, char *argv[])
 				}
         			fputc('\n', fp);
 				putchar('\n');
-        			fclose(fp); 
+        			fclose(fp);
+				system("rm -f message");
 			}
 
 			p += sizeof(struct inotify_event) + event->len;
