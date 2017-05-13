@@ -14,14 +14,11 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/wait.h>
-#include <sys/errno.h>
+
 
 #include"msg_helper.h"
 
-#define N_NS 3
 #define BUF_LEN (10 * (sizeof(struct inotify_event) + NAME_MAX + 1))
-
-int ns[N_NS] = {CLONE_NEWNET, CLONE_NEWNS, CLONE_NEWIPC};
 
 int main(int argc, char *argv[])
 {
@@ -40,71 +37,78 @@ int main(int argc, char *argv[])
 	FILE *fp;
 	char ch;
 	char input[1024];
-	char signal[4];
-	int i;
+	int i,flag;
 
 	int msgqid, rc;
 	struct msg_buf msg;
 
+
+	if(setns(open(argv[1], O_RDONLY), CLONE_NEWNS)){
+		printf("setns mnt fails\n");
+		return 1;
+	}
+
+	if(setns(open(argv[2], O_RDONLY), CLONE_NEWIPC)){
+		printf("setns ipc fails\n");
+		return 1;
+	}
+
+	inotifyFd = inotify_init();                 
+	if (inotifyFd == -1) {
+		perror(strerror(errno));
+		printf("inotifyFd\n");
+		return 1;
+	
+	msgqid = msgget(5566, 0);
+	if (msgqid < 0) {
+		perror(strerror(errno));
+		printf("failed to create message queue with msgqid = %d\n", msgqid);
+		return 1;
+	}
+
+	
 	while(1){
-		if(setns(open(argv[1], O_RDONLY), ns[1])){
-			printf("setns mnt fails\n");
-			return 1;
-		}
-		
-        	inotifyFd = inotify_init();
-        	if (inotifyFd == -1) {
-               		perror(strerror(errno));
-        	        printf("inotifyFd\n");
-                	return 1;
-        	}
-
-        	wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_CLOSE_WRITE);
-        	if (wd == -1) {
-                	perror(strerror(errno));
-                	printf("inotify_add_watch\n");
-        	        return 1;
-	        }
-
-
-		numRead = read(inotifyFd, buf, BUF_LEN);
-		if (numRead <= 0) {
+		wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_CLOSE_WRITE);
+		if (wd == -1) {
 			perror(strerror(errno));
-			printf("read() from inotify fd returned %d!", numRead);
+			printf("inotify_add_watch\n");
 			return 1;
 		}
 
-		for (p = buf; p < buf + numRead; ) {
-			event = (struct inotify_event *) p;
+		flag = 0;
+		while(1) {
+			numRead = read(inotifyFd, buf, BUF_LEN);
+			if (numRead <= 0) {
+				perror(strerror(errno));
+				printf("read() from inotify fd returned %d!", numRead);
+				return 1;
+			}
 
-			if((event->mask & IN_CLOSE_WRITE) && !strcmp(event->name, "message")){
-				fp = fopen("message", "r");
-				i = 0;
-				memset(input, '\0', sizeof(input)); 
-				printf("Bridge recv from mnt : ");
-				while((ch = fgetc(fp)) != '\n'){
-					putchar(ch);
-					input[i]=ch;
-					if(i<4)
-						signal[i]=ch;
-					i++;
-				}
-				printf("\n");
-				fclose(fp);
-				system("rm -f message");
-				if(!strcmp(signal,"exit") && i == 4){
-					break;
+			for (p = buf; p < buf + numRead; ) {
+				event = (struct inotify_event *) p;
+
+				if((event->mask & IN_CLOSE_WRITE) && !strcmp(event->name, "message")){
+					fp = fopen("message", "r");
+					i = 0;
+					memset(input, '\0', sizeof(input)); 
+					printf("Bridge recv from mnt : ");
+					while((ch = fgetc(fp)) != '\n'){
+						putchar(ch);
+						input[i]=ch;
+						i++;
+					}
+					printf("\n");
+					fclose(fp);
+					system("rm -f message");
+					flag = 1;
 				}
 			}
 
 			p += sizeof(struct inotify_event) + event->len;
-		}
-		close(wd);
-                close(inotifyFd);
-		
-		if(setns(open(argv[2], O_RDONLY), ns[2])){
-			printf("setns ipc fails\n");
-			return 1;
+
+			if(flag == 1){
+				break;
+			}
 		}
 
 		msg.mtype = 1;
@@ -116,6 +120,7 @@ int main(int argc, char *argv[])
 			printf("msgsnd failed, rc = %d\n", rc);
 			return 1;
 		}
+
 		if(!strcmp(msg.mtext,"exit"))
 				break;
 
@@ -127,19 +132,40 @@ int main(int argc, char *argv[])
 		} 
 		printf("Bridge recv from ipc : %s\n",msg.mtext);
 
-		if(setns(open(argv[1], O_RDONLY), ns[1])){
-			printf("setns mnt fails\n");
+		wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_DELETE);
+		if (wd == -1) {
+			perror(strerror(errno));
+			printf("inotify_add_watch\n");
 			return 1;
 		}
-		fp = fopen("return", "w");
-		printf("Send : ");
-		for(i = 0; i < strlen(msg.mtext); i++){
-			fputc(msg.mtext[i], fp);
-			putchar(msg.mtext[i]);
-		}
+
+		fp = fopen("message", "w");
+		printf("Bridge send to mnt : %s\n",msg.mtext);
+		fputs(msg.mtext, fp);
 		fputc('\n', fp);
-		putchar('\n');
 		fclose(fp);
+
+		flag = 0; 
+		while(1) {                                 
+			numRead = read(inotifyFd, buf, BUF_LEN);
+			if (numRead <= 0) {
+				perror(strerror(errno));
+				printf("read() from inotify fd returned %ld!", numRead);
+				return 1;
+			}
+
+			for (p = buf; p < buf + numRead; ) {
+				event = (struct inotify_event *) p;
+
+				if((event->mask & IN_DELETE) && !strcmp(event->name, "message"))
+					flag = 1;
+
+				p += sizeof(struct inotify_event) + event->len;
+			}
+			if(flag == 1){
+				break;
+			}
+		}
 	}
 	return 0;
 }

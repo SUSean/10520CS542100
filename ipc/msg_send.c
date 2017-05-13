@@ -30,6 +30,7 @@ int main(int argc,char **argv)
 			printf("msgsnd failed, rc = %d\n", rc);
 			return 1;
 		}
+		printf("Send : %s\n",msg.mtext);
 		if(!strcmp(msg.mtext,"exit"))
 				break;
 		rc = msgrcv(msgqid, &msg, sizeof(msg.mtext), 0, 0); 
