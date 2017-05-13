@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_DELETE);
+	wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_CLOSE_WRITE);
 	if (wd == -1) {
 		perror(strerror(errno));
 		printf("inotify_add_watch\n");
@@ -35,12 +35,16 @@ int main(int argc, char *argv[])
         	char ch;
 		char signal[4];
 		int i = 0;
+		printf("Send : ");
         	while((ch = getchar()) != '\n'){
                 	fputc(ch, fp);
-        		signal[i]=ch;
-                        if(i<4)i++;
+			putchar(ch);
+			if(i<4)
+        			signal[i]=ch;
+			i++;
 		}
         	fputc('\n', fp);
+		putchar('\n');
         	fclose(fp);                                 
 		
 		numRead = read(inotifyFd, buf, BUF_LEN);
@@ -54,9 +58,18 @@ int main(int argc, char *argv[])
 			event = (struct inotify_event *) p;
 
 			//if((event->mask & IN_DELETE) && !strcmp(event->name, "message"))
-			if(!strcmp(signal,"exit"))
+			if(!strcmp(signal,"exit") && i <= 4)
 				goto end;
-			printf("test: %s\n",signal);
+			if((event->mask & IN_CLOSE_WRITE) && !strcmp(event->name, "return")){
+				fp = fopen("return", "r");
+				printf("Recv : ");
+				while((ch = fgetc(fp)) != '\n')
+					putchar(ch);
+				printf("\n");
+				fclose(fp);
+				system("rm -f return");
+			}
+
 			p += sizeof(struct inotify_event) + event->len;
 		}
 	}

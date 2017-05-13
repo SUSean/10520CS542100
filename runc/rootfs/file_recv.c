@@ -43,18 +43,31 @@ int main(int argc, char *argv[])
 			if((event->mask & IN_CLOSE_WRITE) && !strcmp(event->name, "message")){
 				FILE *fp = fopen("message", "r");
 				char ch;
+				char input[1024];
 				char signal[4];
-				int i = 0;
+				int i = 0,j;
 				printf("Recv:");
 				while((ch = fgetc(fp)) != '\n'){
 					putchar(ch);
-					signal[i]=ch;
-					if(i<4)i++;
+					input[i]=ch;
+					if(i<4)
+						signal[i]=ch;
+					i++;
 				}
 				printf("\n");
+				fclose(fp);
 				system("rm -f message");
-				if(!strcmp(signal,"exit"))
+				if(!strcmp(signal,"exit") && i <= 4)
 					goto end;
+				fp = fopen("return", "w");
+				printf("Send : ");
+        			for(j = 0; j < i; j++){
+                			fputc(input[j], fp);
+					putchar(input[j]);
+				}
+        			fputc('\n', fp);
+				putchar('\n');
+        			fclose(fp); 
 			}
 
 			p += sizeof(struct inotify_event) + event->len;
