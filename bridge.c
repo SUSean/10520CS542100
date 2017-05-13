@@ -10,8 +10,16 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/wait.h>
+#include <sys/errno.h>
+
+#include"msg_helper.h"
 
 #define N_NS 3
+#define BUF_LEN (10 * (sizeof(struct inotify_event) + NAME_MAX + 1))
 
 int ns[N_NS] = {CLONE_NEWNET, CLONE_NEWNS, CLONE_NEWIPC};
 
@@ -38,25 +46,26 @@ int main(int argc, char *argv[])
 	int msgqid, rc;
 	struct msg_buf msg;
 
-	inotifyFd = inotify_init();
-	if (inotifyFd == -1) {
-		perror(strerror(errno));
-		printf("inotifyFd\n");
-		return 1;
-	}
-
-	wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_CLOSE_WRITE);
-	if (wd == -1) {
-		perror(strerror(errno));
-		printf("inotify_add_watch\n");
-		return 1;
-	}
-
 	while(1){
 		if(setns(open(argv[1], O_RDONLY), ns[1])){
 			printf("setns mnt fails\n");
 			return 1;
 		}
+		
+        	inotifyFd = inotify_init();
+        	if (inotifyFd == -1) {
+               		perror(strerror(errno));
+        	        printf("inotifyFd\n");
+                	return 1;
+        	}
+
+        	wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_CLOSE_WRITE);
+        	if (wd == -1) {
+                	perror(strerror(errno));
+                	printf("inotify_add_watch\n");
+        	        return 1;
+	        }
+
 
 		numRead = read(inotifyFd, buf, BUF_LEN);
 		if (numRead <= 0) {
@@ -84,15 +93,15 @@ int main(int argc, char *argv[])
 				fclose(fp);
 				system("rm -f message");
 				if(!strcmp(signal,"exit") && i == 4){
-					close(wd);
-					close(inotifyFd);
 					break;
 				}
 			}
 
 			p += sizeof(struct inotify_event) + event->len;
 		}
-
+		close(wd);
+                close(inotifyFd);
+		
 		if(setns(open(argv[2], O_RDONLY), ns[2])){
 			printf("setns ipc fails\n");
 			return 1;
@@ -134,3 +143,4 @@ int main(int argc, char *argv[])
 	}
 	return 0;
 }
+
