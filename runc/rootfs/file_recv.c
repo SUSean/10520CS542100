@@ -23,55 +23,92 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_CLOSE_WRITE);
-	if (wd == -1) {
-		perror(strerror(errno));
-		printf("inotify_add_watch\n");
-		return 1;
-	}
+	FILE *fp;
+	char ch;
+	char input[1024];
+	char signal[4];
+	int i, flag;
 
 	while(1) {     
-		numRead = read(inotifyFd, buf, BUF_LEN);
-		if (numRead <= 0) {
+		wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_CLOSE_WRITE);
+		if (wd == -1) {
 			perror(strerror(errno));
-			printf("read() from inotify fd returned %d!", numRead);
+			printf("inotify_add_watch\n");
 			return 1;
 		}
-		for (p = buf; p < buf + numRead; ) {
-			event = (struct inotify_event *) p;
 
-			if((event->mask & IN_CLOSE_WRITE) && !strcmp(event->name, "message")){
-				FILE *fp = fopen("message", "r");
-				char ch;
-				char input[1024];
-				char signal[4];
-				int i = 0,j;
-				printf("Recv:");
-				while((ch = fgetc(fp)) != '\n'){
-					putchar(ch);
-					input[i]=ch;
-					if(i<4)
-						signal[i]=ch;
-					i++;
-				}
-				printf("\n");
-				fclose(fp);
-				//system("rm -f message");
-				if(!strcmp(signal,"exit") && i == 4)
-					goto end;
-				fp = fopen("return", "w");
-				printf("Send : ");
-        			for(j = 0; j < i; j++){
-                			fputc(input[j], fp);
-					putchar(input[j]);
-				}
-        			fputc('\n', fp);
-				putchar('\n');
-        			fclose(fp);
-				system("rm -f message");
+		flag = 0;
+		while(1){
+			numRead = read(inotifyFd, buf, BUF_LEN);
+			if (numRead <= 0) {
+				perror(strerror(errno));
+				printf("read() from inotify fd returned %d!", numRead);
+				return 1;
 			}
 
-			p += sizeof(struct inotify_event) + event->len;
+			for (p = buf; p < buf + numRead; ) {
+				event = (struct inotify_event *) p;
+
+				if((event->mask & IN_CLOSE_WRITE) && !strcmp(event->name, "message")){
+					fp = fopen("message", "r");
+					i = 0;
+					memset(input, '\0', sizeof(input)); 
+					printf("Recv : ");
+					while((ch = fgetc(fp)) != '\n'){
+						putchar(ch);
+						input[i]=ch;
+						if(i<4)
+							signal[i]=ch;
+						i++;
+					}
+					printf("\n");
+					fclose(fp);
+					system("rm -f message");
+					flag = 1;
+					if(!strcmp(signal,"exit") && i == 4)
+						goto end;
+				}
+
+				p += sizeof(struct inotify_event) + event->len;
+			}
+			if(flag == 1){
+				break;
+			}
+		}
+
+		wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_DELETE);
+		if (wd == -1) {
+			perror(strerror(errno));
+			printf("inotify_add_watch\n");
+			return 1;
+		}
+
+		fp = fopen("message", "w");
+		printf("Send : %s\n", input);
+		fputs(input, fp);
+		fputc('\n', fp);
+		fclose(fp);
+
+		flag = 0;
+		while(1){
+			numRead = read(inotifyFd, buf, BUF_LEN);
+			if (numRead <= 0) {
+				perror(strerror(errno));
+				printf("read() from inotify fd returned %d!", numRead);
+				return 1;
+			}
+
+			for (p = buf; p < buf + numRead; ) {
+				event = (struct inotify_event *) p;
+
+				if((event->mask & IN_DELETE) && !strcmp(event->name, "message"))
+					flag = 1;
+
+				p += sizeof(struct inotify_event) + event->len;
+			}
+			if(flag == 1){
+				break;
+			}
 		}
 	}
 

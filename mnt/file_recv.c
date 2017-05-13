@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 	char ch;
 	char input[1024];
 	char signal[4];
-	int i, j, flag;
+	int i, flag;
 
 	while(1) {     
 		wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_CLOSE_WRITE);

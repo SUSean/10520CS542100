@@ -42,14 +42,13 @@ int main(int argc, char *argv[])
 	int msgqid, rc;
 	struct msg_buf msg;
 
-
+	if(setns(open(argv[2], O_RDONLY), CLONE_NEWIPC)){
+                printf("setns ipc fails\n");
+                return 1;
+        }
+	
 	if(setns(open(argv[1], O_RDONLY), CLONE_NEWNS)){
 		printf("setns mnt fails\n");
-		return 1;
-	}
-
-	if(setns(open(argv[2], O_RDONLY), CLONE_NEWIPC)){
-		printf("setns ipc fails\n");
 		return 1;
 	}
 
@@ -58,8 +57,9 @@ int main(int argc, char *argv[])
 		perror(strerror(errno));
 		printf("inotifyFd\n");
 		return 1;
-	
-	msgqid = msgget(5566, 0);
+	}
+
+	msgqid = msgget(MAGIC, 0);
 	if (msgqid < 0) {
 		perror(strerror(errno));
 		printf("failed to create message queue with msgqid = %d\n", msgqid);
@@ -102,17 +102,17 @@ int main(int argc, char *argv[])
 					system("rm -f message");
 					flag = 1;
 				}
+				
+				p += sizeof(struct inotify_event) + event->len;
 			}
-
-			p += sizeof(struct inotify_event) + event->len;
-
 			if(flag == 1){
 				break;
 			}
 		}
-
+		
 		msg.mtype = 1;
-		sscanf(input, "%s", msg.mtext);
+		memset(msg.mtext, '\0', sizeof(msg.mtext));
+		strncpy(msg.mtext, input, i);
 		printf("Bridge send to ipc : %s\n",msg.mtext);
 		rc = msgsnd(msgqid, &msg, sizeof(msg.mtext), 0);
 		if (rc < 0) {
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
 		}
 
 		if(!strcmp(msg.mtext,"exit"))
-				break;
+			break;
 
 		rc = msgrcv(msgqid, &msg, sizeof(msg.mtext), 0, 0); 
 		if (rc < 0) {
@@ -140,11 +140,11 @@ int main(int argc, char *argv[])
 		}
 
 		fp = fopen("message", "w");
-		printf("Bridge send to mnt : %s\n",msg.mtext);
 		fputs(msg.mtext, fp);
 		fputc('\n', fp);
 		fclose(fp);
-
+		printf("Bridge send to mnt : %s\n",msg.mtext);
+		
 		flag = 0; 
 		while(1) {                                 
 			numRead = read(inotifyFd, buf, BUF_LEN);

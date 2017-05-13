@@ -30,15 +30,16 @@ int main(int argc,char **argv)
 			printf("msgsnd failed, rc = %d\n", rc);
 			return 1;
 		}
+		printf("Send : %s\n",msg.mtext);
 		if(!strcmp(msg.mtext,"exit"))
-        		break;
+				break;
 		rc = msgrcv(msgqid, &msg, sizeof(msg.mtext), 0, 0); 
 		if (rc < 0) {
 			perror( strerror(errno) );
 			printf("msgrcv failed, rc=%d\n", rc);
 			return 1;
 		} 
-		printf("Recv: %s\n",msg.mtext);
+		printf("Recv : %s\n",msg.mtext);
 	}
 	return 0;
 }

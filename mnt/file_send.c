@@ -24,10 +24,10 @@ int main(int argc, char *argv[])
 	}
 
 	
-	FILE fp;
+	FILE *fp;
 	char ch;
 	char signal[4];
-	int i ;
+	int i, flag;
 
 	while(1) {
 		wd = inotify_add_watch(inotifyFd, getcwd(NULL, 0), IN_DELETE);
@@ -98,15 +98,9 @@ int main(int argc, char *argv[])
 
 				if((event->mask & IN_CLOSE_WRITE) && !strcmp(event->name, "message")){
 					fp = fopen("message", "r");
-					i = 0;
-					memset(input, '\0', sizeof(input)); 
 					printf("Recv : ");
 					while((ch = fgetc(fp)) != '\n'){
 						putchar(ch);
-						input[i]=ch;
-						if(i<4)
-							signal[i]=ch;
-						i++;
 					}
 					printf("\n");
 					fclose(fp);
